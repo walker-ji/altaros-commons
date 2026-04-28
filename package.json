@@ -1,0 +1,50 @@
+{
+  "name": "@altaros/commons",
+  "version": "0.0.1",
+  "description": "AltarOS Commons — cross-platform vault folder sync and Claude Code MCP for shared team knowledge bases",
+  "type": "module",
+  "bin": {
+    "altaros-commons": "./bin/altaros-commons.js"
+  },
+  "main": "./dist/index.js",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "bin/",
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "dev": "tsx src/cli.ts",
+    "build": "tsc",
+    "spike": "tsx src/cli.ts spike",
+    "watch": "tsx src/cli.ts watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "altaros",
+    "obsidian",
+    "supabase",
+    "mcp",
+    "claude-code",
+    "knowledge-base",
+    "team-sync"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "chokidar": "^4.0.0",
+    "commander": "^12.1.0",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}
