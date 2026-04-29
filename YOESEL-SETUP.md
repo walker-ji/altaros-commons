@@ -1,5 +1,7 @@
 # Yoesel — `@altaros/commons` setup (Windows)
 
+> **Pair this with `YOESEL-CLAUDE-CODE-SETUP.md`** in this same repo. That one covers Claude Code itself (installing, configuring, the closing ritual, conventions). They go together — this guide is the daemon, that one is the working surface. Either order works.
+
 This walks you through getting set up so that the canonical Zampa knowledge base (vision, system docs, partner work, session digests) is synced to your Obsidian vault on your Windows machine.
 
 After this, you and Walker share one Zampa folder. You both write into it via Obsidian; the daemon handles the sync to Supabase; the other person's machine pulls and the new content appears in their vault.
