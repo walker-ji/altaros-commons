@@ -1,6 +1,6 @@
 # Yoesel — `@altaros/commons` setup (Windows)
 
-> **Pair this with `YOESEL-CLAUDE-CODE-SETUP.md`** in this same repo. That one covers Claude Code itself (installing, configuring, the closing ritual, conventions). They go together — this guide is the daemon, that one is the working surface. Either order works.
+> **Pair this with `YOESEL-CLAUDE-DESKTOP-SETUP.md`** in this same repo. That one covers the Claude Desktop app (installing, MCP filesystem, the Zampa project + custom instructions, the closing ritual). They go together — this guide is the daemon (cross-machine sync); that one is the working surface (where you actually do sessions). Either order works.
 
 This walks you through getting set up so that the canonical Zampa knowledge base (vision, system docs, partner work, session digests) is synced to your Obsidian vault on your Windows machine.
 
