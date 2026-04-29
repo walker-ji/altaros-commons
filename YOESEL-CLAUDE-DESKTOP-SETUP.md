@@ -202,56 +202,67 @@ Don't feel obligated to do everything in Desktop. Use the right tool for the mom
 
 ---
 
-## Two machines: desktop (home) + laptop (out and about)
+## Two machines: desktop (your primary) + laptop (out and about)
 
-You work on two Windows machines, and you'll want both wired up. The good news: **Obsidian Sync handles vault-to-vault between your devices automatically**, so you only need to think about the per-machine setup, not about cross-machine consistency.
-
-### What gets configured on each machine
-
-Both desktop and laptop need:
-
-1. **Claude Desktop** installed + signed in (Steps 1–2 above)
-2. **`claude_desktop_config.json`** with the MCP filesystem server (Step 3) — paths adjusted to that machine's drive layout (your home folder name should match: `C:\Users\Yoesel\...`)
-3. **`altaros-commons` repo cloned** + `npm install` + `.env` (see `YOESEL-SETUP.md`) — `.env` values are identical across both machines except for `VAULT_ROOT`, which points at that machine's vault location
-4. The **"Zampa" project + Custom Instructions** (Step 4) — these are stored on your Anthropic account, not per-machine. Since you're signed into the same account, the project shows up automatically on both machines. Just verify it appears in the laptop sidebar after sign-in.
+You work on two Windows machines — desktop at home (primary) and laptop on the go. Good news: **Obsidian Sync already keeps your vault aligned between them**, so this is simpler than it sounds. The daemon only needs to run on **one** machine.
 
 ### How the data flows
 
 ```
-Walker's Mac vault Zampa/  ⇄  Supabase (documents table)  ⇄  Yoesel's daemon
-                                                                  ⇡⇣
-                                              Yoesel's vault Zampa/ (whichever machine)
-                                                       ⇡⇣ Obsidian Sync
-                                              Yoesel's vault Zampa/ (other machine)
+Walker's Mac vault Zampa/  ⇄  Supabase  ⇄  Yoesel's desktop daemon
+                                                  ⇡⇣
+                                          Yoesel's vault Zampa/ (desktop)
+                                                  ⇡⇣ Obsidian Sync
+                                          Yoesel's vault Zampa/ (laptop)
 ```
 
-Two sync layers, doing different jobs:
-- **Obsidian Sync** keeps your desktop's vault and laptop's vault aligned with each other. Already does this for everything you have in Obsidian.
-- **`altaros-commons` daemon** keeps your vault aligned with Walker's via Supabase. Runs on at least one of your machines.
+Two sync layers, each doing one job:
+- **Obsidian Sync** keeps your desktop and laptop vaults aligned (your side, between your devices). Already does this for everything in your vault.
+- **`altaros-commons` daemon** runs on **desktop only** — keeps the desktop's vault aligned with Walker's via Supabase.
 
-### Daemon-running options
+### What goes on each machine
 
-**Option A — daemon on both, always watch:**
-- Lowest friction. No machine-switching steps. Just open whichever machine, both daemons keep running in the background.
-- Slight wastefulness: when Obsidian Sync delivers a file to the inactive machine, its daemon notices and re-pushes to Supabase as a no-op (same content). Idempotent, just a few extra API calls per day.
-- Recommended for Phase A. **Start here.**
+**Desktop (primary):**
+1. Claude Desktop installed + signed in (Steps 1–2)
+2. `claude_desktop_config.json` with MCP filesystem server (Step 3)
+3. `altaros-commons` repo cloned + `npm install` + `.env` configured (see `YOESEL-SETUP.md`)
+4. **`altaros-commons` daemon running**: `npm run watch` in a PowerShell tab, kept open while you work
+5. "Zampa" project + Custom Instructions in Claude Desktop (Step 4)
 
-**Option B — daemon only on the active machine:**
-- Stop desktop's `npm run watch` (Ctrl+C) before grabbing the laptop. Start watch on laptop after `npm run dev -- pull` (to catch up on anything Walker pushed in between).
-- Cleaner sync-state but adds a context-switch ritual.
-- Useful only if you start seeing churn under Option A.
+**Laptop (mobile):**
+1. Claude Desktop installed + signed in (same account → "Zampa" project + Custom Instructions appear automatically)
+2. `claude_desktop_config.json` with MCP filesystem server — paths adjusted if needed
+3. **No `altaros-commons` daemon needed.** Obsidian Sync handles delivery to/from desktop.
+
+### Round-trip example
+
+1. Sitting at laptop in a café, edit `Zampa/sessions/2026-04-30-yoesel-debug-payment.md` in Obsidian
+2. Obsidian Sync propagates the file to your desktop at home (within ~30 sec when both online)
+3. Desktop's daemon (`npm run watch`) sees the new file, pushes to Supabase
+4. Walker pulls on his Mac, sees your digest
+
+When desktop is off and you're on laptop:
+- Edits queue in Obsidian Sync, deliver to desktop when it comes back online
+- Walker sees the change shortly after
+- Same in reverse: Walker's pushes land in desktop's vault, propagate to laptop via Obsidian Sync once desktop is on
+
+This is fine for ordinary work patterns. Latency only adds up if your desktop is off for days.
+
+### Optional fallback for long trips away from desktop
+
+If you're out for a week and want direct sync from laptop to Supabase without going through desktop, install `altaros-commons` on laptop too (same setup as desktop, with laptop's `VAULT_ROOT`). **Don't run it normally** — keep the watch off. When you actually need it (extended desktop outage), run `npm run dev -- pull` then `npm run dev -- watch` from laptop. Stop it before powering desktop back on, otherwise both daemons end up pushing the same content (idempotent but noisy).
+
+For Phase A, you probably don't need this — desktop is reliable enough that its daemon covers normal travel.
 
 ### One thing to avoid
 
-**Don't actively edit the same file on both machines at the same minute.** Obsidian Sync handles ordinary back-and-forth, but if both versions diverge before Obsidian Sync resolves, the daemon's last-write-wins policy will pick one. Phase B adds Obsidian-Sync-style conflict-copy semantics — until then, a small dose of common sense (save and close before switching machines) is enough.
+**Don't actively edit the same file on both machines at the same minute.** Obsidian Sync handles ordinary back-and-forth, but two simultaneous edits will conflict. The daemon's last-write-wins picks one. Phase B adds conflict-copy semantics. For now: save and close on the old machine before starting work on the new one.
 
-### Setup order recommended
+### Setup order
 
-1. **Desktop first** — full setup (Steps 1–6). Verify the round-trip with Walker.
-2. **Then laptop** — reuse desktop's `claude_desktop_config.json` content (adjust paths if needed), reuse desktop's `.env` content (adjust `VAULT_ROOT`), confirm the "Zampa" project shows up. Run `pull`. Should land identical-to-desktop state.
-3. **Verify Obsidian Sync is on for both** — Settings → Sync → status should show "Synced" on each machine.
-
-After both are set up, you have parity. Pick a machine, work, close session with the prompt, things propagate everywhere.
+1. **Desktop first** — full setup (Steps 1–6 above). Run a real first session, verify round-trip with Walker.
+2. **Then laptop** — Steps 1–4 only (skip the daemon install). Confirm "Zampa" project appears, MCP filesystem connects, you can read/write `Zampa/` files via Claude Desktop on laptop. Obsidian Sync handles propagating any laptop-side writes through to desktop's daemon.
+3. **Verify Obsidian Sync is on for both** — Obsidian Settings → Sync → status should show "Synced".
 
 ---
 
@@ -296,4 +307,4 @@ After both are set up, you have parity. Pick a machine, work, close session with
 5. Run a real task in a Zampa-project chat; close with "please fully document this session in all appropriate places"
 6. Verify the digest landed in `<vault>/Zampa/sessions/`
 7. Daemon pushes to Supabase; Walker pulls and sees it. Loop closed.
-8. Repeat steps 1–3 on your laptop (Project + custom instructions roll over automatically). Run daemons on both machines (Option A); Obsidian Sync handles vault-to-vault between them.
+8. On your laptop: Steps 1–4 only (Claude Desktop + MCP filesystem). **No daemon on laptop** — your desktop daemon handles Supabase via Obsidian Sync delivering files between your two machines.
