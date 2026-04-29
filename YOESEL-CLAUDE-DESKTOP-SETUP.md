@@ -1,229 +1,245 @@
-# Yoesel — Claude Code setup guide
+# Yoesel — Claude Desktop setup guide
 
-You're moving from Claude (web/chat) to Claude Code (CLI). Same Claude underneath — but Code reads and writes files in your repos, runs commands, and can keep working sessions structured. This guide gets you set up the right way for our team's workflow on Zampa.
+You're moving from the Claude web app to the Claude **Desktop app** — the standalone Windows installer from claude.ai. Same Claude underneath, but Desktop can connect to **MCP servers** that give it real read/write access to your filesystem (your Zampa code repo, your Obsidian vault). That's how it becomes useful for coding work and the team's session-digest workflow.
 
-> **Companion guide**: `YOESEL-SETUP.md` in this repo covers installing the `altaros-commons` daemon. Do that one too — it's the bridge between you, Walker, and (eventually) InnoTech.
+> **Companion guide**: `YOESEL-SETUP.md` in this repo covers installing the `altaros-commons` daemon (the cross-machine sync). Do that one too — it's the bridge between you, Walker, and (eventually) InnoTech. Either order works.
 
 ---
 
-## What's actually different from Chat
+## What's actually different from web Chat
 
-| | Chat | Code |
+| | Web (claude.ai) | Desktop |
 |---|---|---|
-| **Where it lives** | claude.ai in browser | A terminal on your machine |
-| **What it can touch** | Just the conversation | Your filesystem — reads + writes files in the repo you launch it in |
-| **Memory** | Per-conversation | Each working directory has its own context (via `CLAUDE.md` files) |
-| **Zampa code work** | Cut-and-paste back and forth | Edits files in place, runs tests, makes commits |
-| **Best for** | Quick questions, exploration | Real coding sessions, decisions you want documented |
+| **Where it lives** | Browser | Standalone app on your taskbar |
+| **What it can touch** | Just the conversation + uploads | Your filesystem, via **MCP servers** you authorize |
+| **Persistent context** | Per-conversation | **Projects** with custom instructions + workspace files |
+| **For coding** | Cut-and-paste back and forth | Edits files in place once MCP filesystem is wired up |
+| **Best for** | Quick reads, mobile | Real working sessions where you want files touched + decisions captured |
 
-You'll keep using Chat for some things (quick reads, mobile, casual). Code is for **working sessions**.
-
----
-
-## Step 1 — Install Claude Code
-
-If you haven't already:
-
-```powershell
-# In PowerShell, run as your user (NOT admin):
-npm install -g @anthropic-ai/claude-code
-```
-
-Verify:
-```powershell
-claude --version
-```
-
-If `npm` isn't found: install **Node.js 20+ LTS** from [nodejs.org](https://nodejs.org/) first, restart PowerShell, retry.
+You'll keep using web Chat for some things (mobile, quick reads). Desktop is for **working sessions**.
 
 ---
 
-## Step 2 — First sign-in + model
+## Step 1 — Install Claude Desktop
 
-```powershell
-claude
-```
+1. Go to [claude.ai/download](https://claude.ai/download)
+2. Download the **Windows installer** (.exe)
+3. Run it, sign in with your Anthropic account (same one as web)
 
-Walks you through OAuth sign-in (your Anthropic account — same one as Chat). Pick:
-- **Model**: Claude Sonnet 4.5 (or latest available — defaults are fine)
-- **Theme**: dark or light, your call
-- **Trust this directory**: yes (when prompted in your Zampa repo)
-
-When you're in, type `/help` to see commands.
+When it opens, the UI looks similar to the web app — sidebar with chats on the left, conversation in the middle.
 
 ---
 
-## Step 3 — Where to launch Claude Code
+## Step 2 — Pick model + verify settings
 
-You'll have **three different working directories** that matter, each with different purposes:
+In the model dropdown (top of conversation): **Claude Sonnet 4.5** (or latest available).
 
-### A. Your Zampa code repo (where you develop)
-Wherever you cloned `zampa-platform` on your Windows machine. Probably something like:
-```
-C:\Users\Yoesel\Documents\zampa-platform
-```
-
-**This is where most Claude Code sessions happen.** Open PowerShell, `cd` into it, run `claude`. From here, Claude can read your code, run tests, commit changes.
-
-### B. `altaros-commons` (the sync daemon)
-The repo you clone from `YOESEL-SETUP.md`. You'll occasionally `cd` here to run `npm run dev -- pull` / `push` / `watch`, or to fix daemon issues — usually not for Claude Code work.
-
-### C. Your Obsidian vault (`Zampa/` folder inside)
-**Don't launch Claude Code here.** This is reference material, not a codebase. Claude reads from here when you point it at it (e.g., "look at `Zampa/partners/dk-bank/checkout-ux-spec-v2.md`"), but the working directory should stay in (A).
+Settings → Profile: confirm your name + email. This is what shows up if Claude needs to reference you.
 
 ---
 
-## Step 4 — Set up your user-level `CLAUDE.md`
+## Step 3 — The critical step: MCP filesystem server
 
-This file teaches Claude on your machine the conventions our team uses. It applies in every project you open, not just Zampa.
+This is what makes Desktop useful for coding. Without it, Claude can't read or write files on your machine — it's still just chat.
 
-**Location on Windows**:
+The MCP filesystem server is a small Node.js process that runs on demand, gives Claude access to **specific folders you whitelist**, and exits when Claude closes. You configure which folders it can see.
+
+### Prerequisites
+
+- **Node.js 20+** installed (you'll need this anyway for the `altaros-commons` daemon — see `YOESEL-SETUP.md`). Verify in PowerShell: `node --version`
+
+### Configure
+
+The Claude Desktop config file lives at:
+
 ```
-%USERPROFILE%\.claude\CLAUDE.md
+%APPDATA%\Claude\claude_desktop_config.json
 ```
 
-i.e. `C:\Users\Yoesel\.claude\CLAUDE.md`. The `.claude` folder may already exist after Step 2; if not, create it.
+i.e. `C:\Users\Yoesel\AppData\Roaming\Claude\claude_desktop_config.json`. The `Claude` folder may not exist yet — create it. The file may not exist yet — create it with this content:
 
-**Open it in any editor** (`notepad %USERPROFILE%\.claude\CLAUDE.md`) and paste in:
+```json
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "C:/Users/Yoesel/zampa-platform",
+        "C:/Users/Yoesel/Documents/ObsidianVault/Zampa"
+      ]
+    }
+  }
+}
+```
 
-```markdown
-# Personal CLAUDE.md — Yoesel (Zampa team)
+**Replace the two paths** with:
+1. The actual path to your Zampa code repo on Windows (where you develop)
+2. The path to the `Zampa/` subfolder inside your Obsidian vault (which will be populated after `altaros-commons pull`)
+
+Forward slashes work on Windows in JSON (cleaner than escaping backslashes). Both these paths must be **absolute** and **must exist** when Claude Desktop starts.
+
+> **Why two paths?** The first is your code (where Thread 1 of the closing ritual writes — repo docs, ADRs, inline). The second is the team knowledge base (where Thread 2 writes — session digests). Both need read/write.
+
+Save the file and **fully restart Claude Desktop** (quit from system tray, relaunch). MCP servers only start at app launch.
+
+### Verify it's connected
+
+In a new conversation, look at the bottom-right of the input area — you should see an MCP indicator (icon or number showing "1 MCP"). Click it; "filesystem" should appear in the list.
+
+Test it: ask Claude `list the files in my Zampa folder`. It should respond with actual filenames from your vault, not a refusal.
+
+If something's wrong:
+- Indicator missing → config JSON has a typo, or `npx` isn't on PATH (check PowerShell `where.exe npx`)
+- Says "no access" → path in config doesn't exist yet, or has typo
+- Test: open Notepad, save a tiny test.txt in one of the whitelisted folders, ask Claude to read it. Round-trip confirms.
+
+---
+
+## Step 4 — Create a "Zampa" project with team conventions
+
+Claude Desktop's **Projects** feature pins persistent context across all chats inside that project. This is where the team conventions live.
+
+In the sidebar, click **Projects → New Project**. Name it: `Zampa`.
+
+Open project Settings → **Custom Instructions**. Paste this:
+
+```
+This project is the Zampa team's working space. I'm Yoesel — co-founder
++ lead developer, working with Walker (in Bhutan) on Zampa, a payment +
+event platform. The team also has Sonam (finance), Wangchuk (tech,
+InnoTech), and Panjo (external partner, InnoTech director).
+
+I have an MCP filesystem server that gives you access to my Zampa code
+repo and the team's shared knowledge base at <vault>/Zampa/. The
+shared knowledge base has its own CLAUDE.md at the root — read that
+first when working in this project, it explains the team's
+conventions in detail.
 
 ## Closing ritual: two threads
 
-When I say "please fully document this session in all appropriate places",
-document in two threads:
+When I say "please fully document this session in all appropriate
+places", document in two threads:
 
-1. **Repo thread** — code-adjacent: update READMEs, ADRs, docs/, inline
-   comments wherever the changes warrant. Native Edit/Write. Audience:
-   anyone reading the code.
+1. **Repo thread** — code-adjacent: update READMEs, ADRs, docs/,
+   inline comments wherever code changes warrant. Audience: anyone
+   reading the code.
 
 2. **Vault thread** — team-context: write a session digest at
-   `<vault>/Zampa/sessions/YYYY-MM-DD-yoesel-{slug}.md`, using the
-   template at `<vault>/Zampa/sessions/_template.md`. Cross-reference
+   <vault>/Zampa/sessions/YYYY-MM-DD-yoesel-{slug}.md, using the
+   template at <vault>/Zampa/sessions/_template.md. Cross-reference
    any repo files written in (1) by path.
 
-Until commons-mcp ships (Phase B), the vault digest is hand-authored
-from the template.
-
-The vault path is wherever my Obsidian vault is — same as the
-`VAULT_ROOT` in my `~/altaros-commons/.env`.
+(Eventually a `commons.log_session()` MCP tool will automate Thread
+2 — Phase B of the build. For now, hand-author from the template.)
 
 ## Conventions
 
 - Filenames: lowercase-hyphen, ASCII only, under 100 chars,
-  date-prefix for sessions (YYYY-MM-DD)
-- Author slug in filenames: `yoesel`
-- `<vault>/Zampa/_commons/` is read-only — AltarOS writes there, not me
-- Project name in shared work: "Zampa" (the Supabase slug is still
-  "kuzu" for legacy reasons; use "Zampa" in user-facing copy)
+  date-prefix for sessions (YYYY-MM-DD).
+- My author slug in filenames: `yoesel`.
+- <vault>/Zampa/_commons/ is read-only — AltarOS writes there, not
+  me.
+- Project name in user-facing text: "Zampa". The Supabase project
+  slug is still "kuzu" for legacy hashtext-salt reasons; use "Zampa"
+  in everything human-readable.
 
 ## Tone
 
-I'm working with Walker (Bhutan) on Zampa, a payment + event platform
-in Bhutan. I'm a co-founder + lead developer. Direct collaboration
-style; concise responses preferred over long-winded ones.
+Direct collaboration; concise responses preferred over long-winded
+ones. Walker and I both prefer terse-and-correct over verbose-and-
+hedged.
 ```
 
-Save and close. From this point on, every Claude Code session you start anywhere on your machine has this context.
+Save. **Every chat you start inside the Zampa project now inherits these instructions.** New chats outside the project don't.
 
 ---
 
-## Step 5 — Read the project-level `CLAUDE.md` files
+## Step 5 — Read the existing CLAUDE.md files
 
-Each repo can have its own `CLAUDE.md` that gives Claude context-specific guidance. Two you should read:
+Once the MCP filesystem is wired and your `altaros-commons pull` has populated `<vault>/Zampa/`, ask Claude in a Zampa-project chat:
 
-### `<vault>/Zampa/CLAUDE.md`
-The team-conventions doc for the canonical Zampa knowledge base. It teaches Claude how the folder is organized and where session digests / decisions / partner docs go. **Read this in Obsidian** after your first `pull`. Reference, not action.
+```
+Read <vault>/Zampa/CLAUDE.md and <vault>/Zampa/README.md
+and confirm you understand the folder structure.
+```
 
-### `<your zampa-platform repo>/CLAUDE.md`
-If Walker already has one in the Zampa code repo, read it for code-specific guidance. If not, ask him — together you can write one. It would cover things like:
-- Where docs live (`docs/`, ADRs)
-- Test conventions
-- DK Bank / Stripe integration patterns
-- Anything Zampa-codebase-specific that Claude should know
+(Replace `<vault>` with the actual path.)
+
+Claude should respond summarizing the folder layout. If yes, you're set up correctly.
+
+If your **Zampa code repo** has its own `CLAUDE.md` (Walker may have authored one), point Claude at that too — it has code-specific guidance.
 
 ---
 
 ## Step 6 — Your first session, the right way
 
-Once everything's set up, the simplest first real test:
+A simple test of the full loop:
 
-1. `cd` into your Zampa code repo
-2. `claude`
-3. Ask Claude to help with a small Zampa task — could be a real one you were going to do anyway, or a documentation update for the new commons setup
-4. Work the task
-5. **Close with**: `please fully document this session in all appropriate places`
+1. Open a chat in the Zampa project
+2. Ask Claude to help with a small task on the Zampa code repo — could be a real one you were going to do, or just a dry run
+3. Work the task — Claude edits files via the MCP filesystem
+4. **Close with**: `please fully document this session in all appropriate places`
 
 What should happen:
 - Claude updates any relevant repo docs (Thread 1)
 - Claude writes `<vault>/Zampa/sessions/2026-04-29-yoesel-onboarding.md` using the template (Thread 2)
-- Your daemon (running `npm run watch` in another terminal, or do `npm run dev -- push` manually) propagates the digest to Supabase
-- Walker pulls on his side, sees your first digest
+- The `altaros-commons` daemon (running in a separate PowerShell with `npm run watch`, or do `npm run dev -- push` manually) propagates the digest to Supabase
+- Walker pulls on his side and sees your first digest
 
 That's the round-trip. Once it works, the workflow is in place.
 
 ---
 
-## Step 7 — Optional: keyboard tricks
+## Step 7 — When to use Desktop vs. web Chat
 
-A few that pay off:
+**Desktop**: any session where you want files touched, decisions captured, code changed, or the project-level conventions to apply.
 
-- `/help` inside a Claude session shows all commands
-- `/clear` resets the conversation context (without quitting)
-- `/compact` summarizes the conversation when it gets long, frees up context
-- `Esc` while Claude is working interrupts gracefully — better than Ctrl+C
-- `Shift+Tab` inserts a newline; `Enter` submits
+**Web Chat**: quick questions on the go, mobile, brainstorming with no code involved. Sometimes useful to have a separate space without the formal closing ritual hanging over it.
+
+Don't feel obligated to do everything in Desktop. Use the right tool for the moment.
 
 ---
 
-## Step 8 — Keep Chat for what it's good for
+## Coming in Phase B (weeks, not months)
 
-You don't need to abandon Chat. Some things Chat is still better for:
-- Quick questions on the go (mobile)
-- Brainstorming when there's no code involved
-- Exploration where you don't want artifacts
-- Conversations with Walker about design decisions before they become code
-
-Code is for the working sessions where you want files touched, decisions captured, and the legibility loop running.
+- A native **`commons-mcp`** server you'll add alongside the filesystem one. It exposes `commons.log_session()`, `commons.draft_session_digest()`, `commons.team_state()`. The closing ritual goes from "Claude writes a markdown file" to "Claude calls a tool that writes the markdown + emits a Supabase notification." Cleaner.
+- **Stop-hook auto-draft** — the digest gets proposed automatically at session-end without you typing the prompt. You just review and confirm.
+- Until then, the manual flow is the contract.
 
 ---
 
-## What to do if something feels wrong
+## Troubleshooting
 
-- **Stuck on install / auth**: Walker can help live, or check `claude --help`
-- **Claude doesn't know about the team conventions**: verify your `~/.claude/CLAUDE.md` exists with content from Step 4
-- **Closing prompt produces a repo edit but no vault digest**: probably means Claude can't find the vault path — ask it explicitly to write to the path
-- **Sync feels broken**: check `npm run dev -- doctor` from `altaros-commons/` (the daemon, not Claude Code)
-- **You disagree with a convention**: capture it in your next session digest, propose changes. The format isn't sacred — it's a starting shape we'll evolve.
+**MCP indicator missing after restart**:
+- JSON syntax error in `claude_desktop_config.json` — validate it pasted into [jsonlint.com](https://jsonlint.com)
+- `npx` not on PATH — open PowerShell, run `where.exe npx`, should print a path
 
----
+**"Access denied" when Claude tries to read/write a file**:
+- That folder isn't in the `args` list in `claude_desktop_config.json`
+- Add it, restart Desktop fully
 
-## How this fits the bigger picture
+**Custom Instructions not being followed**:
+- Confirm you're in the Zampa project (sidebar shows "Zampa" highlighted)
+- New chat inside the project? Settings inherit per-project, not per-chat
+- Sometimes Claude needs a gentle reminder mid-conversation: "remember the Zampa project conventions"
 
-Right now (Phase A complete):
-- 92 canonical Zampa docs are in your vault after `pull`
-- Walker's machine reads them for synthesis (AltarOS), so he can ask his system questions about Zampa and get context-aware answers
-- Your machine writes session digests when you close sessions; they sync to Walker's machine
-- You and Walker are now legible to each other across machines
+**You disagree with a convention**:
+- Capture it in your next session digest, propose the change. Format isn't sacred — it's an evolving shape we'll converge on.
 
-Coming (Phase B, weeks not months):
-- A Claude Code MCP that automates the digest writing — `commons.log_session(...)` instead of hand-authoring
-- Conflict-copy semantics on simultaneous edits
-- Full-monorepo install (`npm install -g @altaros/commons`)
-- InnoTech rollout
-
-Coming further (Phase D, months):
-- Possibly open-source as `claude-session-digest-mcp` — your patterns and feedback shape that
+**Where to ask for help**:
+- Walker first
+- Anything Walker can't quickly fix — capture as a session digest. It lands in his vault on next pull and becomes the queue for Phase B work.
 
 ---
 
 ## TL;DR
 
-1. `npm install -g @anthropic-ai/claude-code`
-2. `claude` → sign in → pick Sonnet 4.5
-3. Create `%USERPROFILE%\.claude\CLAUDE.md` with the content from Step 4
-4. From your Zampa code repo, run `claude`, work a task, close with "please fully document this session in all appropriate places"
-5. Verify the session digest landed in `<vault>/Zampa/sessions/`
-6. Sync via `altaros-commons` daemon (separate guide)
-7. Walker sees it on his side. Loop closed.
+1. Install Claude Desktop from claude.ai/download → sign in → pick Sonnet 4.5
+2. Create `%APPDATA%\Claude\claude_desktop_config.json` with the filesystem MCP config (Step 3) — paths to your Zampa code repo + vault Zampa folder
+3. Restart Desktop fully; verify MCP indicator shows "filesystem"
+4. Create a "Zampa" project; paste the custom instructions from Step 4
+5. Run a real task in a Zampa-project chat; close with "please fully document this session in all appropriate places"
+6. Verify the digest landed in `<vault>/Zampa/sessions/`
+7. Daemon pushes to Supabase; Walker pulls and sees it. Loop closed.
