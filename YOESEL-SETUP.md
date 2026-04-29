@@ -40,7 +40,7 @@ Pick a folder to put it in. Walker uses `~/Music/altaros-commons` on his Mac; on
 
 ```powershell
 cd $env:USERPROFILE
-git clone <REPO-URL-FROM-WALKER> altaros-commons
+git clone https://github.com/walker-ji/altaros-commons.git altaros-commons
 cd altaros-commons
 ```
 
